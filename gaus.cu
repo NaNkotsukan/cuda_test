@@ -30,44 +30,67 @@ void showArray(float *a, int n){
 }
 
 
-__global__ void mkide(float *a, int n){
+// __global__ void mkide(float *a, int n){
+//     int index = blockIdx.x * blockDim.x + threadIdx.x;
+//     a[index*n+index] = 1;
+// }
+
+// __global__ void divRow(float *a, float *b, float x, int n){
+//     int index = blockIdx.x * blockDim.x + threadIdx.x;
+//     if(index<n){
+//         a[index] /= x;
+//         b[index] /= x;
+//     }
+// }
+
+// __global__ void GaussElimination(float *a, float *b, int n, int i){
+//     int index = blockIdx.x * blockDim.x + threadIdx.x;
+//     if(index != i && index < n){
+//         float t = a[index*n+i];
+//         for(int k = 0; k < n; ++k){
+//             a[index*n+k] -= a[i*n+k]*t;
+//             b[index*n+k] -= b[i*n+k]*t;
+//         }
+//     }
+// }
+
+// void GaussJordanGpuOptimize(float *a, float *b, int n){
+//     int blockSize = n/32 + (n%32 ? 1 : 0);
+//     mkide<<<blockSize,32>>>(b, n);
+//     cudaDeviceSynchronize();
+//     // for(int i = 0; i < n; ++i){
+//     //     b[i*n+i] = 1;
+//     // }
+//     for(int i = 0;i<n; ++i){
+//         int in = i*n;
+//         float t = a[in+i];
+//         divRow<<<blockSize, 32>>>(&a[in], &b[in], t, n);
+//         cudaDeviceSynchronize();
+//         GaussElimination<<<blockSize, 32>>>(a, b, n, i);
+//         cudaDeviceSynchronize();
+//     }
+// }
+__global__ void GaussJordanGpuOptimize(float *a, float *b, int n){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     a[index*n+index] = 1;
-}
-
-__global__ void divRow(float *a, float *b, float x, int n){
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if(index<n){
-        a[index] /= x;
-        b[index] /= x;
-    }
-}
-
-__global__ void GaussElimination(float *a, float *b, int n, int i){
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if(index != i && index < n){
-        float t = a[index*n+i];
-        for(int k = 0; k < n; ++k){
-            a[index*n+k] -= a[i*n+k]*t;
-            b[index*n+k] -= b[i*n+k]*t;
-        }
-    }
-}
-
-void GaussJordanGpuOptimize(float *a, float *b, int n){
-    int blockSize = n/32 + (n%32 ? 1 : 0);
-    mkide<<<blockSize,32>>>(b, n);
-    cudaDeviceSynchronize();
-    // for(int i = 0; i < n; ++i){
-    //     b[i*n+i] = 1;
-    // }
+    __syncthreads();
+    
     for(int i = 0;i<n; ++i){
         int in = i*n;
         float t = a[in+i];
-        divRow<<<blockSize, 32>>>(&a[in], &b[in], t, n);
-        cudaDeviceSynchronize();
-        GaussElimination<<<blockSize, 32>>>(a, b, n, i);
-        cudaDeviceSynchronize();
+        if(index<n){
+            a[index] /= x;
+            b[index] /= x;
+        }
+        __syncthreads();
+        if(index != i && index < n){
+            float t = a[index*n+i];
+            for(int k = 0; k < n; ++k){
+                a[index*n+k] -= a[i*n+k]*t;
+                b[index*n+k] -= b[i*n+k]*t;
+            }
+        }
+        __syncthreads();
     }
 }
 
@@ -155,10 +178,11 @@ int main(){
     for(int j = 10;j<10000;j*=10){
         for(int i=1;i<9;++i){
             int N = j*i;
+            int blockSize = N/32 + (N%32 ? 1 : 0);
             cudaMemcpy(ref, a, n*n*sizeof(float), cudaMemcpyHostToDevice);
             start = std::chrono::system_clock::now();
             // GaussJordan(a, b, N);
-            GaussJordanGpuOptimize(a, b, N);
+            GaussJordanGpuOptimize<<<blockSize, 32>>>(a, b, N);
             cudaDeviceSynchronize();
             
             end = std::chrono::system_clock::now();
