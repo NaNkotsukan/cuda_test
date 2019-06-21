@@ -72,24 +72,23 @@ void showArray(float *a, int n){
 // }
 __global__ void GaussJordanGpuOptimize(float *a, float *b, int n){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if(index<n){
-        a[index*n+index] = 1;
-        __syncthreads(); 
-        for(int i = 0;i<n; ++i){
-            int in = i*n;
-            float t = a[in+i];
-            a[in+index] /= t;
-            b[in+index] /= t;
-            __syncthreads();
-            for(int j=0;j<n;++j){
-                if(j != i){
-                    float t = a[j*n+i];
-                    a[j*n+index] -= a[in+index]*t;
-                    b[j*n+index] -= b[in+index]*t;
-                }
+    if(index>=n)return;
+    a[index*n+index] = 1;
+    __syncthreads(); 
+    for(int i = 0;i<n; ++i){
+        int in = i*n;
+        float t = a[in+i];
+        a[in+index] /= t;
+        b[in+index] /= t;
+        __syncthreads();
+        for(int j=0;j<n;++j){
+            if(j != i){
+                float t = a[j*n+i];
+                a[j*n+index] -= a[in+index]*t;
+                b[j*n+index] -= b[in+index]*t;
             }
-            __syncthreads();
         }
+        __syncthreads();
     }
 }
 
