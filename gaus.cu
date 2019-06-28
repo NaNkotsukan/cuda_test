@@ -37,6 +37,7 @@ __global__ void mkide(float *a, int n){
 
 __global__ void divRow(float *a, float *b, float t, int n){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
+    printf("%d\n", index);
     if(index<n){
         a[index] /= t;
         b[index] /= t;
@@ -62,6 +63,7 @@ __global__ void GaussElimination(float *a, float *b, float *t, int n, int i){
     if(col >= n || row >= n || i == col || i == row) return;
     int index = col * n + row;
 
+    printf("%d %d\n", col, row);
     // a[index*n+k] -= __ldg(a[i*n+k])*t[col];
     // b[index*n+k] -= __ldg(b[i*n+k])*t[col];
     a[index*n+row] -= a[i*n+row]*t[col];
@@ -78,6 +80,8 @@ __host__ void GaussJordanGpuOptimize(float *a, float *b, int n){
     // }
     dim3 thread(32);
     dim3 block(n, n/32 + n%32!=0);
+
+    printf("%d, %d, %d\n", n, n/32 + n%32!=0, 32);
     // float *t_;
     // cudaMalloc(&t_, sizeof(float)*n);
     for(int i = 0;i<n; ++i){
@@ -87,6 +91,9 @@ __host__ void GaussJordanGpuOptimize(float *a, float *b, int n){
         cudaMemcpyToSymbol(t, a, n, in, cudaMemcpyDeviceToDevice);
         GaussElimination<<<block, thread>>>(a, b, t, n, i);
         cudaDeviceSynchronize();
+        std::cout<<i<<" "<<in<<std::endl;
+        std::cout<<thread.x<<" "<<thread.y<<" "<<thread.z<<std::endl;
+        std::cout<<block.x<<" "<<block.y<<" "<<block.z<<std::endl;
     }
 }
 
