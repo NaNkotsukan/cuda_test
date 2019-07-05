@@ -1,6 +1,7 @@
 #include <iostream>
 #include <chrono>
 #include <random>
+#include <math.h>
 
 
 #define CHECK(call)                                                            \
@@ -13,6 +14,22 @@
                 cudaGetErrorString(error));                                    \
     }                                                                          \
 }
+
+void dot(float *a, float *b, float *y, int n){
+    for(int i = 0; i < n; ++i)
+    {
+        for(int j = 0; j < n; ++j)
+        {
+            double r = 0;
+            for(int k = 0; k < n; ++k)
+            {
+                r += a[i*n+k] * b[k*n+j];
+            }
+            y[i*n+j] = abs(r)<0.001?0: r;
+        }
+    }
+}
+
 
 void inputArray(float *a, int n){
     for(int i=0;i<n*n;++i){
@@ -37,8 +54,8 @@ __global__ void mkide(float *a, int n){
 
 __global__ void divRow(float *a, float *b, float *s, int n, int i){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    // printf("%d\n", index);
     if(index<n){
+        // printf("%d\n", index);
         // printf("%f\n", b[i*n+index]);
         float t = a[i*n+i];
         a[i*n+index] /= t;
@@ -63,10 +80,10 @@ __global__ void GaussElimination(float *a, float *b, float *t, int n, int i){
     //-- a?b[i*n:i*n+k]はキャッシュorシェアード --、tはコンスタントメモリを使うべき?
     //無駄になるスレッド多いし要修正
     int col = blockIdx.x;
-    int row = blockIdx.y*blockDim.y + threadIdx.x;
-    // printf("%d %d\n", col, row);
+    int row = blockIdx.y*blockDim.x + threadIdx.x;
     // if(col >= n || row >= n || i == col || i == row) return;
     if(row >= n || i == col) return;
+    // printf("%d %d %d\n", col, row, blockDim.x);
     int index = col * n + row;
     // printf("%d %f %f\n", index, a[index], t[col]);
 
@@ -78,16 +95,18 @@ __global__ void GaussElimination(float *a, float *b, float *t, int n, int i){
 
 __constant__ float t[10000];
 __host__ void GaussJordanGpuOptimize(float *a, float *b, int n){
+    
     int blockSize = n/32 + (n%32 ? 1 : 0);
+    printf("blockSize %d\n",blockSize);
     mkide<<<blockSize,32>>>(b, n);
     cudaDeviceSynchronize();
     // for(int i = 0; i < n; ++i){
     //     b[i*n+i] = 1;
     // }
     dim3 thread(32);
-    dim3 block(n, n/32 + n%32!=0);
+    dim3 block(n, n/32 + (n%32 ? 1 : 0));
 
-    // printf("%d, %d, %d\n", n, n/32 + n%32!=0, 32);
+    printf("%d, %d, %d\n", n, n/32 + (n%32 ? 1 : 0), 32);
     float *s;
     cudaMalloc(&s, sizeof(float)*n);
 
@@ -96,11 +115,13 @@ __host__ void GaussJordanGpuOptimize(float *a, float *b, int n){
         // std::cout<<i<<" "<<in<<" "<<&a[in]<<" "<<&b[in]<<std::endl;
         // std::cout<<thread.x<<" "<<thread.y<<" "<<thread.z<<std::endl;
         // std::cout<<block.x<<" "<<block.y<<" "<<block.z<<std::endl;
-        divRow<<<blockSize, 32>>>(a, b, s, n, i);
+        divRow<<<blockSize, thread>>>(a, b, s, n, i);
         cudaDeviceSynchronize();
         // cudaMemcpyToSymbol(t, &a[in], n, cudaMemcpyDeviceToDevice);
+
         GaussElimination<<<block, thread>>>(a, b, s, n, i);
-        cudaDeviceSynchronize();
+        CHECK(cudaDeviceSynchronize());
+
     }
 }
 
@@ -174,7 +195,7 @@ void GaussJordan(float *a, float *b, int n){
 
 
 int main(){
-    int n = 10000;
+    int n = 800;
     // std::cin>>n;
     std::chrono::system_clock::time_point  start, end; 
     std::mt19937 mt(982359349);
@@ -186,16 +207,19 @@ int main(){
     }
     std::cout<<std::endl;
     
-    float *a, *b, *buf;
+    float *a, *b;
     // *a = (float*)calloc(n*n, sizeof(float));
     // *b = (float*)calloc(n*n, sizeof(float));
     cudaMalloc(&a, n*n*sizeof(float));
     cudaMalloc(&b, n*n*sizeof(float));
-    buf = (float*)calloc(n*n, sizeof(float));
+    float *buf = (float*)calloc(n*n, sizeof(float));
+    float *a_ = (float*)calloc(n*n, sizeof(float));
+    float *b_ = (float*)calloc(n*n, sizeof(float));
+    float *y_ = (float*)calloc(n*n, sizeof(float));
     // cudaMallocManaged(&a, n*n*sizeof(float));
     // cudaMallocManaged(&b, n*n*sizeof(float));
     for(int i = 0;i<n*n;i++){
-        buf[i] = MyRand(mt);
+        a_[i] = MyRand(mt);
         // std::cout<<ref[i]<<" ";
     }
 
@@ -208,38 +232,48 @@ int main(){
     
     
     
-    for(int j = 10;j<=10000;j*=10){
-        for(int i=1;i<10;++i){
-            int N = j*i;
-            int blockSize = N/32 + (N%32 ? 1 : 0);
-            cudaMemcpy(ref, a, n*n*sizeof(float), cudaMemcpyHostToDevice);
-            start = std::chrono::system_clock::now();
-            // GaussJordan(a, b, N);
-            GaussJordanGpuOptimize(a, b, N);
-            // GaussJordanGpuOptimize<<<blockSize, 32>>>(a, b, N);
-            cudaDeviceSynchronize();
+    // for(int j = 10;j<=10000;j*=10){
+    //     for(int i=1;i<10;++i){
+    //         int N = j*i;
+    //         int blockSize = N/32 + (N%32 ? 1 : 0);
+    //         cudaMemcpy(ref, a, n*n*sizeof(float), cudaMemcpyHostToDevice);
+    //         start = std::chrono::system_clock::now();
+    //         // GaussJordan(a, b, N);
+    //         GaussJordanGpuOptimize(a, b, N);
+    //         // GaussJordanGpuOptimize<<<blockSize, 32>>>(a, b, N);
+    //         cudaDeviceSynchronize();
             
-            end = std::chrono::system_clock::now();
-            
-            
-            double elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-            std::cout<<N<<"\t"<<elapsed<<std::endl;
+    //         end = std::chrono::system_clock::now();
             
             
-        }
+    //         double elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+    //         std::cout<<N<<"\t"<<elapsed<<std::endl;
+            
+            
+    //     }
         
-    }
+    // }
     // std::cout<<"hoge"<<std::endl;
     // inputArray(a, n);
     // std::cout<<"hoge"<<std::endl;
-    // cudaMemcpy(a, buf, n*n*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(a, a_, n*n*sizeof(float), cudaMemcpyHostToDevice);
+    // showArray(a_, n);
+    GaussJordanGpuOptimize(a, b, n);
+    cudaDeviceSynchronize();
+    cudaMemcpy(buf, a, n*n*sizeof(float), cudaMemcpyDeviceToHost);
     // showArray(buf, n);
-    // GaussJordanGpuOptimize(a, b, n);
-    // cudaDeviceSynchronize();
-    // cudaMemcpy(buf, a, n*n*sizeof(float), cudaMemcpyDeviceToHost);
-    // showArray(buf, n);
-    // cudaMemcpy(buf, b, n*n*sizeof(float), cudaMemcpyDeviceToHost);
-    // showArray(buf, n);
+    cudaMemcpy(b_, b, n*n*sizeof(float), cudaMemcpyDeviceToHost);
+    // showArray(b_, n);
+    std::cout<<"meow"<<std::endl;
+    dot(a_, b_, y_, n);
+    double sum=0;
+    for(int i = 0;i<n*n;++i)sum+=buf[i];
+    std::cout<<sum<<std::endl;
+    sum = 0;
+    for(int i = 0;i<n*n;++i)sum+=y_[i];
+    std::cout<<sum<<std::endl;
+    // showArray(y_, n);
+
 
 
     return 0;
