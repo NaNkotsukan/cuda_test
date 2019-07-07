@@ -195,7 +195,7 @@ void GaussJordan(float *a, float *b, int n){
 
 
 int main(){
-    int n = 800;
+    int n = 1000;
     // std::cin>>n;
     std::chrono::system_clock::time_point  start, end; 
     std::mt19937 mt(982359349);
@@ -229,7 +229,7 @@ int main(){
     // float *b;
     // CHECK(cudaMallocManaged(&b, n*n*sizeof(float)));
 
-    
+
     
     
     // for(int j = 10;j<=10000;j*=10){
@@ -253,9 +253,19 @@ int main(){
     //     }
         
     // }
-    // std::cout<<"hoge"<<std::endl;
-    // inputArray(a, n);
-    // std::cout<<"hoge"<<std::endl;
+
+    // float *s;
+    // cudaMalloc(&s, sizeof(float)*n);
+    // dim3 thread(32);
+    // dim3 block(n, n/32 + (n%32 ? 1 : 0));
+    // cudaMemcpy(a, a_, n*n*sizeof(float), cudaMemcpyHostToDevice);
+    // GaussElimination<<<block, thread>>>(a, b, s, n, i);
+
+
+
+    // // std::cout<<"hoge"<<std::endl;
+    // // inputArray(a, n);
+    // // std::cout<<"hoge"<<std::endl;
     cudaMemcpy(a, a_, n*n*sizeof(float), cudaMemcpyHostToDevice);
     // showArray(a_, n);
     GaussJordanGpuOptimize(a, b, n);
