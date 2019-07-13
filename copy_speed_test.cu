@@ -13,32 +13,31 @@ __global__ void mkarry(float *a){
 int main(){
     float *a;
     int N = 8*32*1000*1000*sizeof(float);
+    float milliseconds;
     cudaMalloc(&a, N);
     cudaMemset(&a, 0, N);
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
+
+    milliseconds = 0;
     cudaEventRecord(start);
     cudaMemset(&a, 0, N);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
-    float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
     std::cout<<N<<"\t"<<milliseconds<<std::endl;
-    
-    cudaEventRecord(start);
 
+    milliseconds = 0;
+    cudaEventRecord(start);
     mkarry<<<N/32, 32>>>(a);
     cudaDeviceSynchronize();
-
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
-
     cudaEventElapsedTime(&milliseconds, start, stop);
     std::cout<<N<<"\t"<<milliseconds<<std::endl;
+
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
-
-
 
 }
