@@ -17,6 +17,7 @@ void showArray(float *a, int n){
 int main(){
     cublasHandle_t cublas_handle;
     int n_samples, n_features, n_targets;
+    cublasCreate(&cublas_handle);
     n_samples = 5;
     n_features = 10;
     n_targets = 15;
@@ -39,7 +40,7 @@ int main(){
     for(int i = 0;i < n_features * n_features;++i){
         coef_matrix[i]= 0;
     }
-    float rho = 1.0;            
+    float rho = 0;            
 
     float inv_n_samp = 1.0f/n_samples;
     float alpha = 1.0f;
@@ -47,24 +48,35 @@ int main(){
         n_samples, n_targets, n_features,
         &alpha,
         X, n_samples,
-        W, n_targets,
+        W, n_features,
         &rho,
         Y,
-        n_features);
+        n_samples);
     cudaDeviceSynchronize();
-    showArray(Y, n_features);
+    showArray(Y, 15);
 
-    cublasSgemm(cublas_handle, CUBLAS_OP_N, CUBLAS_OP_T,
-        n_features, n_features, n_samples,
+    cublasSgemm(cublas_handle, CUBLAS_OP_T, CUBLAS_OP_T,
+        n_targets, n_samples, n_features,
         &alpha,
+        W, n_features,
         X, n_samples,
-        W, n_samples,
         &rho,
         Y,
-        n_features);
-
+        n_targets);
     cudaDeviceSynchronize();
-    showArray(Y, n_features);
+    showArray(Y, 15);
+
+    // cublasSgemm(cublas_handle, CUBLAS_OP_N, CUBLAS_OP_T,
+    //     n_features, n_features, n_samples,
+    //     &alpha,
+    //     X, n_samples,
+    //     W, n_samples,
+    //     &rho,
+    //     Y,
+    //     n_features);
+
+    // cudaDeviceSynchronize();
+    // showArray(Y, n_features);
     
 
     return 0;
