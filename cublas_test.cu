@@ -43,7 +43,7 @@ int main(){
 
     float inv_n_samp = 1.0f/n_samples;
     float alpha = 1.0f;
-    cublasSgemm(cublas_handle, CUBLAS_OP_N, CUBLAS_OP_T,
+    cublasSgemm(cublas_handle, CUBLAS_OP_N, CUBLAS_OP_N,
         n_samples, n_targets, n_features,
         &alpha,
         X, n_samples,
