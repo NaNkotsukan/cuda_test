@@ -41,7 +41,7 @@ int main(){
     }
     float rho = 1.0;            
 
-
+    float inv_n_samp = 1.0f/n_samples;
     cublasSgemm(cublas_handle, CUBLAS_OP_N, CUBLAS_OP_T,
         n_features, n_features, n_samples
         1.0f/n_samples,
