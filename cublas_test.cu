@@ -48,7 +48,7 @@ int main(){
         &alpha,
         X, n_samples,
         W, n_samples,
-        rho,
+        &rho,
         Y,
         n_features);
     cudaDeviceSynchronize();
@@ -59,7 +59,7 @@ int main(){
         &alpha,
         X, n_samples,
         W, n_samples,
-        rho,
+        &rho,
         Y,
         n_features);
 
