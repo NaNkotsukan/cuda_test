@@ -16,7 +16,7 @@ void showArray(float *a, int n){
 
 int main(){
     cublasHandle_t cublas_handle;
-    int n_samples, int n_features;
+    int n_samples, n_features, n_targets;
     n_samples = 5;
     n_features = 10;
     n_targets = 15;
@@ -43,7 +43,7 @@ int main(){
 
     float inv_n_samp = 1.0f/n_samples;
     cublasSgemm(cublas_handle, CUBLAS_OP_N, CUBLAS_OP_T,
-        n_features, n_features, n_samples
+        n_features, n_features, n_samples,
         1.0f/n_samples,
         X, n_samples,
         W, n_samples,
@@ -51,10 +51,10 @@ int main(){
         Y,
         n_features);
     cudaDeviceSynchronize();
-    showArray(Y, n_samples);
+    showArray(Y, n_features);
 
     cublasSgemm(cublas_handle, CUBLAS_OP_N, CUBLAS_OP_T,
-        n_features, n_features, n_samples
+        n_features, n_features, n_samples,
         1.0f/n_samples,
         X, n_samples,
         W, n_samples,
@@ -63,7 +63,7 @@ int main(){
         n_features);
 
     cudaDeviceSynchronize();
-    showArray(Y, n_samples);
+    showArray(Y, n_features);
     
 
     return 0;
